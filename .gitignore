@@ -4,3 +4,4 @@
 **/.git/
 *.user
 *.suo
+node_modules/
