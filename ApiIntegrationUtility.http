@@ -1,0 +1,6 @@
+@ApiIntegrationUtility_HostAddress = http://localhost:5162
+
+GET {{ApiIntegrationUtility_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
