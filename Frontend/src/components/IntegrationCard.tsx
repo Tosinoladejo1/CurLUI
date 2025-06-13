@@ -14,26 +14,26 @@ const IntegrationCard: FC<Props> = ({ integration, onRun, onDelete }) => {
   return (
     <div className="border p-4 rounded shadow-sm flex justify-between items-center hover:shadow-md transition-all">
       <div>
-        <h3 className="text-lg font-medium">{integration.name}</h3>
+        <h3 className="text-lg font-semibold text-gray-800">{integration.name}</h3>
         <p className="text-sm text-gray-500">{integration.requests.length} request(s)</p>
       </div>
-      <div className="space-x-2">
+      <div className="flex space-x-2">
         <button
           onClick={() => navigate(`/integration/${integration.id}`)}
-          className="px-3 py-1 bg-blue-500 text-white rounded"
+          className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 transition"
         >
           Edit
         </button>
         <button
           onClick={onRun}
-          className="px-3 py-1 bg-green-600 text-white rounded"
+          className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 transition"
         >
           Run
         </button>
         {onDelete && (
           <button
             onClick={onDelete}
-            className="px-3 py-1 bg-red-600 text-white rounded"
+            className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 transition"
           >
             Delete
           </button>

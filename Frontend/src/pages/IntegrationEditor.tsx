@@ -19,6 +19,19 @@ export default function IntegrationEditor() {
     }
   }, [id]);
 
+  const saveToStorage = (newRequests: RequestItem[]) => {
+    const stored = localStorage.getItem("integrations");
+    if (!stored) return;
+
+    const integrations: Integration[] = JSON.parse(stored);
+    const integrationIndex = integrations.findIndex((i) => i.id === id);
+    if (integrationIndex === -1) return;
+
+    integrations[integrationIndex].requests = newRequests;
+    localStorage.setItem("integrations", JSON.stringify(integrations));
+    setRequests(newRequests);
+  };
+
   const addRequest = () => {
     const newReq: RequestItem = {
       id: uuidv4(),
@@ -29,45 +42,56 @@ export default function IntegrationEditor() {
       useBearerToken: false,
     };
 
-    const stored = localStorage.getItem("integrations");
-  if (!stored) return;
+    const updatedRequests = [...requests, newReq];
+    saveToStorage(updatedRequests);
+    navigate(`/integration/${id}/request/${newReq.id}`);
+  };
 
-  const integrations: Integration[] = JSON.parse(stored);
-  const integrationIndex = integrations.findIndex((i) => i.id === id);
-  if (integrationIndex === -1) return;
-
-  // Push the new request into the correct integration
-  integrations[integrationIndex].requests.push(newReq);
-
-  // Save back to localStorage
-  localStorage.setItem("integrations", JSON.stringify(integrations));
-
-  // Update local state
-  setRequests([...integrations[integrationIndex].requests]);
-
-  // Navigate to the request editor
-  navigate(`/integration/${id}/request/${newReq.id}`);
+  const deleteRequest = (reqId: string) => {
+    const updated = requests.filter((r) => r.id !== reqId);
+    saveToStorage(updated);
   };
 
   return (
-    <div className="p-4">
-      <h2 className="text-lg font-semibold mb-4">Integration Editor</h2>
+    <div className="p-4 space-y-4">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-semibold">Integration Editor</h2>
+        <button
+          onClick={() => navigate("/")}
+          className="bg-gray-600 text-white px-4 py-2 rounded"
+        >
+          Done
+        </button>
+      </div>
+
       <button
         onClick={addRequest}
-        className="bg-blue-500 text-white px-4 py-2 rounded"
+        className="bg-blue-600 text-white px-4 py-2 rounded"
       >
         Add Request
       </button>
-      <ul className="mt-4 space-y-2">
+
+      <ul className="space-y-2">
         {requests.map((req) => (
-          <li key={req.id} className="p-2 border rounded">
-            <span>{req.method} {req.url || "(no URL yet)"}</span>
-            <button
-              onClick={() => navigate(`/integration/${id}/request/${req.id}`)}
-              className="ml-4 text-blue-600"
-            >
-              Edit
-            </button>
+          <li
+            key={req.id}
+            className="p-3 border rounded flex justify-between items-center"
+          >
+            <span>{req.method} — {req.url || "(no URL yet)"}</span>
+            <div className="space-x-2">
+              <button
+                onClick={() => navigate(`/integration/${id}/request/${req.id}`)}
+                className="text-blue-500"
+              >
+                Edit
+              </button>
+              <button
+                onClick={() => deleteRequest(req.id)}
+                className="text-red-500"
+              >
+                Delete
+              </button>
+            </div>
           </li>
         ))}
       </ul>

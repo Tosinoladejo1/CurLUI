@@ -4,17 +4,11 @@ import type { Integration } from "../types/types";
 import IntegrationCard from "../components/IntegrationCard";
 import { v4 as uuidv4 } from "uuid";
 
-interface ResponseData {
-  status: number;
-  time: string;
-  body: any;
-}
-
 export default function Home() {
   const [integrations, setIntegrations] = useState<Integration[]>([]);
-  const [responses, setResponses] = useState<Record<string, ResponseData>>({});
   const navigate = useNavigate();
 
+  // Load integrations from localStorage once on mount
   useEffect(() => {
     const stored = localStorage.getItem("integrations");
     if (stored) {
@@ -22,140 +16,136 @@ export default function Home() {
     }
   }, []);
 
+  // Save to localStorage on every update
   useEffect(() => {
     localStorage.setItem("integrations", JSON.stringify(integrations));
   }, [integrations]);
 
+  // Create a new integration
   const addIntegration = () => {
     const newIntegration: Integration = {
       id: uuidv4(),
       name: `Integration ${integrations.length + 1}`,
       requests: [],
     };
-    setIntegrations([...integrations, newIntegration]);
-    navigate(`/integration/${newIntegration.id}`);
+
+    const updated = [...integrations, newIntegration];
+    localStorage.setItem("integrations", JSON.stringify(updated));
+    setIntegrations(updated);
+
+    // Navigate to integration editor
+    setTimeout(() => {
+      navigate(`/integration/${newIntegration.id}`);
+    }, 0);
   };
 
+  // Delete integration
+  const deleteIntegration = (id: string) => {
+    const updated = integrations.filter((i) => i.id !== id);
+    setIntegrations(updated);
+    localStorage.setItem("integrations", JSON.stringify(updated));
+  };
+
+  // Run integration sequentially
   const runIntegration = async (integration: Integration) => {
-    const runtimeValues: Record<string, string> = {
-      userId: "1", // You can later collect this from a modal/input
-    };
+    // Collect all placeholders like {{userId}}, {{token}}, etc.
+    const placeholders = Array.from(
+      new Set(
+        integration.requests.flatMap((req) => {
+          const matches = req.url.match(/{{(.*?)}}/g) || [];
+          return matches.map((m) => m.slice(2, -2));
+        })
+      )
+    );
 
-    const newResponses: Record<string, ResponseData> = {};
-
-    for (const request of integration.requests) {
-      let url = request.url;
-      let body = request.body;
-
-      Object.entries(runtimeValues).forEach(([key, val]) => {
-        const regex = new RegExp(`{{${key}}}`, "g");
-        url = url.replace(regex, val);
-        body = body.replace(regex, val);
-      });
-
-      const headers = { ...request.headers };
-      if (request.useBearerToken) {
-        headers["Authorization"] = "Bearer your_token_here";
-      }
-
-      const start = performance.now();
-      try {
-        const res = await fetch(url, {
-          method: request.method,
-          headers,
-          body: ["POST", "PUT", "PATCH"].includes(request.method) ? body : undefined,
-        });
-
-        const time = (performance.now() - start).toFixed(0) + "ms";
-        const text = await res.text();
-        const bodyJson = (() => {
-          try {
-            return JSON.parse(text);
-          } catch {
-            return text;
-          }
-        })();
-
-        newResponses[request.id] = {
-          status: res.status,
-          time,
-          body: bodyJson,
-        };
-      } catch (err) {
-        newResponses[request.id] = {
-          status: 0,
-          time: "Error",
-          body: { error: (err as Error).message },
-        };
+    const valueMap: Record<string, string> = {};
+    for (const key of placeholders) {
+      const val = prompt(`Enter value for "${key}"`);
+      if (val !== null) {
+        valueMap[key] = val;
       }
     }
 
-    setResponses(newResponses);
-  };
+    for (const req of integration.requests) {
+      const url = req.url.replace(/{{(.*?)}}/g, (_, key) => valueMap[key] || "");
+      const method = req.method?.toUpperCase?.() || "GET";
 
-  const deleteIntegration = (id: string) => {
-    setIntegrations(integrations.filter((i) => i.id !== id));
+      // ✅ Validate HTTP method
+      const validMethods = ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"];
+      if (!validMethods.includes(method)) {
+        console.error(`❌ Invalid HTTP method: "${method}"`);
+        alert(`Invalid HTTP method: "${method}" in one of the requests`);
+        continue;
+      }
+
+      const headers: Record<string, string> = {
+        ...req.headers,
+      };
+      if (req.useBearerToken && valueMap["token"]) {
+        headers["Authorization"] = `Bearer ${valueMap["token"]}`;
+      }
+
+      const start = performance.now();
+
+      try {
+        const res = await fetch(url, {
+          method,
+          headers,
+          body: ["GET", "DELETE", "HEAD", "OPTIONS"].includes(method) ? undefined : req.body,
+        });
+
+        const time = performance.now() - start;
+        const text = await res.text();
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch {
+          data = text;
+        }
+
+        if (!res.ok) {
+          console.error(`❌ ${method} ${url} failed with status ${res.status}`);
+          console.error("Error Response:", data);
+          alert(`❌ Request failed: ${method} ${url}\nStatus: ${res.status}`);
+          continue;
+        }
+
+        console.log("✅", method, url);
+        console.log("Status:", res.status);
+        console.log("Time:", `${time.toFixed(2)} ms`);
+        console.log("Response:", data);
+      } catch (err) {
+        console.error("❌ Network error on", method, url);
+        console.error(err);
+        alert(`❌ Network error: ${method} ${url}`);
+      }
+    }
   };
 
   return (
     <div className="p-4">
       <h1 className="text-2xl font-bold mb-4">Your Integrations</h1>
       <button
-        className="bg-blue-600 text-white px-4 py-2 rounded"
+        className="bg-blue-600 text-white px-4 py-2 rounded mb-4"
         onClick={addIntegration}
       >
-        Add Integration
+        ➕ Add Integration
       </button>
-      <div className="mt-4 space-y-6">
-        {integrations.map((integration) => (
-          <div key={integration.id} className="border p-4 rounded shadow">
-            <div className="flex justify-between items-center">
-              <div>
-                <h2 className="text-lg font-semibold">{integration.name}</h2>
-                <p className="text-sm text-gray-500">{integration.requests.length} request(s)</p>
-              </div>
-              <div className="space-x-2">
-                <button
-                  onClick={() => navigate(`/integration/${integration.id}`)}
-                  className="bg-blue-500 text-white px-3 py-1 rounded"
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={() => runIntegration(integration)}
-                  className="bg-green-600 text-white px-3 py-1 rounded"
-                >
-                  Run
-                </button>
-                <button
-                  onClick={() => deleteIntegration(integration.id)}
-                  className="bg-red-600 text-white px-3 py-1 rounded"
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
 
-            {/* Show response viewer */}
-            {integration.requests.map((req) => {
-              const res = responses[req.id];
-              return res ? (
-                <div key={req.id} className="mt-4 p-3 border-t">
-                  <p className="text-sm text-gray-600 mb-1">
-                    <strong>{req.method}</strong> {req.url}
-                  </p>
-                  <p className="text-sm">
-                    <strong>Status:</strong> {res.status} | <strong>Time:</strong> {res.time}
-                  </p>
-                  <pre className="bg-gray-100 p-2 text-sm rounded overflow-x-auto">
-                    {JSON.stringify(res.body, null, 2)}
-                  </pre>
-                </div>
-              ) : null;
-            })}
-          </div>
-        ))}
-      </div>
+      {integrations.length === 0 ? (
+        <p className="text-gray-500">No integrations yet.</p>
+      ) : (
+        <div className="space-y-3">
+          {integrations.map((int) => (
+            <IntegrationCard
+              key={int.id}
+              integration={int}
+              onRun={() => runIntegration(int)}
+              onDelete={() => deleteIntegration(int.id)}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

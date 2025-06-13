@@ -1,9 +1,10 @@
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import type { Integration, RequestItem } from "../types/types";
 
 export default function RequestEditor() {
   const { id: integrationId, requestId } = useParams();
+  const navigate = useNavigate();
   const [request, setRequest] = useState<RequestItem | null>(null);
 
   useEffect(() => {
@@ -102,6 +103,15 @@ export default function RequestEditor() {
           />
           Use Bearer Token
         </label>
+      </div>
+
+      <div className="pt-4">
+        <button
+          onClick={() => navigate(`/integration/${integrationId}`)}
+          className="bg-gray-700 text-white px-4 py-2 rounded"
+        >
+          Done
+        </button>
       </div>
     </div>
   );
