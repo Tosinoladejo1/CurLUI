@@ -1,16 +1,27 @@
 using Xunit;
 using System;
-using System.Collections.Generic;
+using Microsoft.EntityFrameworkCore;
 using ApiIntegrationUtility.Models;
 using ApiIntegrationUtility.Services;
+using ApiIntegrationUtility.Data;
 
 public class IntegrationServiceTests
 {
+    private IntegrationService CreateService()
+    {
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+
+        var context = new AppDbContext(options);
+        return new IntegrationService(context);
+    }
+
     [Fact]
     public void Add_ShouldStoreIntegration()
     {
-        var service = new IntegrationService();
-        var integration = new Integration { Id = Guid.NewGuid(), Name = "Test" };
+        var service = CreateService();
+        var integration = new Integration { IntegrationId = Guid.NewGuid(), Name = "Test" };
 
         service.Add(integration);
 
@@ -22,9 +33,9 @@ public class IntegrationServiceTests
     [Fact]
     public void GetById_ShouldReturnCorrectIntegration()
     {
-        var service = new IntegrationService();
+        var service = CreateService();
         var id = Guid.NewGuid();
-        service.Add(new Integration { Id = id, Name = "Match" });
+        service.Add(new Integration { IntegrationId = id, Name = "Match" });
 
         var result = service.GetById(id);
 
@@ -35,11 +46,11 @@ public class IntegrationServiceTests
     [Fact]
     public void Update_ShouldReplaceExistingIntegration()
     {
-        var service = new IntegrationService();
+        var service = CreateService();
         var id = Guid.NewGuid();
-        service.Add(new Integration { Id = id, Name = "Old" });
+        service.Add(new Integration { IntegrationId = id, Name = "Old" });
 
-        service.Update(new Integration { Id = id, Name = "New" });
+        service.Update(new Integration { IntegrationId = id, Name = "New" });
 
         var updated = service.GetById(id);
         Assert.Equal("New", updated!.Name);
@@ -48,9 +59,9 @@ public class IntegrationServiceTests
     [Fact]
     public void Delete_ShouldRemoveIntegration()
     {
-        var service = new IntegrationService();
+        var service = CreateService();
         var id = Guid.NewGuid();
-        service.Add(new Integration { Id = id, Name = "DeleteMe" });
+        service.Add(new Integration { IntegrationId = id, Name = "DeleteMe" });
 
         service.Delete(id);
 

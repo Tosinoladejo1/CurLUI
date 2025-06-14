@@ -2,150 +2,128 @@ import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import type { Integration } from "../types/types";
 import IntegrationCard from "../components/IntegrationCard";
+import API from "../utility/api";
 import { v4 as uuidv4 } from "uuid";
 
 export default function Home() {
-  const [integrations, setIntegrations] = useState<Integration[]>([]);
-  const navigate = useNavigate();
+    const [integrations, setIntegrations] = useState<Integration[]>([]);
+    const [showInput, setShowInput] = useState(false);
+    const [integrationName, setIntegrationName] = useState("");
+    const navigate = useNavigate();
 
-  // Load integrations from localStorage once on mount
-  useEffect(() => {
-    const stored = localStorage.getItem("integrations");
-    if (stored) {
-      setIntegrations(JSON.parse(stored));
-    }
-  }, []);
+    useEffect(() => {
+        API.get("/api/Integrations")
+            .then((res) => setIntegrations(res.data))
+            .catch((err) => {
+                console.error("Failed to load integrations", err);
+                alert("Error loading integrations from server.");
+            });
+    }, []);
 
-  // Save to localStorage on every update
-  useEffect(() => {
-    localStorage.setItem("integrations", JSON.stringify(integrations));
-  }, [integrations]);
+    const submitIntegration = async () => {
+        if (!integrationName.trim()) return;
 
-  // Create a new integration
-  const addIntegration = () => {
-    const newIntegration: Integration = {
-      id: uuidv4(),
-      name: `Integration ${integrations.length + 1}`,
-      requests: [],
+        try {
+            const res = await API.post("/api/Integrations", {
+                name: integrationName.trim(),
+                requests: [],
+            });
+            const savedIntegration: Integration = res.data;
+
+            setIntegrations([...integrations, savedIntegration]);
+            setIntegrationName("");
+            setShowInput(false);
+            navigate(`/integration/${savedIntegration.integrationId}`);
+        } catch (err) {
+            console.error("Failed to create integration", err);
+            alert("Could not save integration to server.");
+        }
     };
 
-    const updated = [...integrations, newIntegration];
-    localStorage.setItem("integrations", JSON.stringify(updated));
-    setIntegrations(updated);
-
-    // Navigate to integration editor
-    setTimeout(() => {
-      navigate(`/integration/${newIntegration.id}`);
-    }, 0);
-  };
-
-  // Delete integration
-  const deleteIntegration = (id: string) => {
-    const updated = integrations.filter((i) => i.id !== id);
-    setIntegrations(updated);
-    localStorage.setItem("integrations", JSON.stringify(updated));
-  };
-
-  // Run integration sequentially
-  const runIntegration = async (integration: Integration) => {
-    // Collect all placeholders like {{userId}}, {{token}}, etc.
-    const placeholders = Array.from(
-      new Set(
-        integration.requests.flatMap((req) => {
-          const matches = req.url.match(/{{(.*?)}}/g) || [];
-          return matches.map((m) => m.slice(2, -2));
-        })
-      )
-    );
-
-    const valueMap: Record<string, string> = {};
-    for (const key of placeholders) {
-      const val = prompt(`Enter value for "${key}"`);
-      if (val !== null) {
-        valueMap[key] = val;
-      }
-    }
-
-    for (const req of integration.requests) {
-      const url = req.url.replace(/{{(.*?)}}/g, (_, key) => valueMap[key] || "");
-      const method = req.method?.toUpperCase?.() || "GET";
-
-      // ✅ Validate HTTP method
-      const validMethods = ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"];
-      if (!validMethods.includes(method)) {
-        console.error(`❌ Invalid HTTP method: "${method}"`);
-        alert(`Invalid HTTP method: "${method}" in one of the requests`);
-        continue;
-      }
-
-      const headers: Record<string, string> = {
-        ...req.headers,
-      };
-      if (req.useBearerToken && valueMap["token"]) {
-        headers["Authorization"] = `Bearer ${valueMap["token"]}`;
-      }
-
-      const start = performance.now();
-
-      try {
-        const res = await fetch(url, {
-          method,
-          headers,
-          body: ["GET", "DELETE", "HEAD", "OPTIONS"].includes(method) ? undefined : req.body,
-        });
-
-        const time = performance.now() - start;
-        const text = await res.text();
-        let data;
+    const deleteIntegration = async (integrationId: string) => {
         try {
-          data = JSON.parse(text);
-        } catch {
-          data = text;
+            await API.delete(`/api/Integrations/${integrationId}`);
+            setIntegrations((prev) => prev.filter((i) => i.integrationId !== integrationId));
+        } catch (err) {
+            console.error("Delete failed", err);
+            alert("Failed to delete integration");
         }
+    };
 
-        if (!res.ok) {
-          console.error(`❌ ${method} ${url} failed with status ${res.status}`);
-          console.error("Error Response:", data);
-          alert(`❌ Request failed: ${method} ${url}\nStatus: ${res.status}`);
-          continue;
-        }
+    return (
+        <div className="min-h-screen bg-gray-900 text-gray-200 px-6 py-10">
+            <h1 className="text-5xl font-bold text-blue-400 text-center mb-10 tracking-wide">CurLUI</h1>
 
-        console.log("✅", method, url);
-        console.log("Status:", res.status);
-        console.log("Time:", `${time.toFixed(2)} ms`);
-        console.log("Response:", data);
-      } catch (err) {
-        console.error("❌ Network error on", method, url);
-        console.error(err);
-        alert(`❌ Network error: ${method} ${url}`);
-      }
-    }
-  };
+            <div className="flex flex-col items-center mb-8 space-y-3">
+                {showInput ? (
+                    <div className="flex gap-3">
+                        <input
+                            type="text"
+                            value={integrationName}
+                            onChange={(e) => setIntegrationName(e.target.value)}
+                            placeholder="Enter integration name..."
+                            className="px-4 py-2 rounded-md bg-gray-800 text-white border border-gray-600 focus:ring-2 focus:ring-blue-500 outline-none w-72"
+                        />
+                        <button
+                            onClick={submitIntegration}
+                            disabled={!integrationName.trim()}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition disabled:opacity-50"
+                        >
+                            Create
+                        </button>
+                        <button
+                            onClick={() => {
+                                setShowInput(false);
+                                setIntegrationName("");
+                            }}
+                            className="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                ) : (
+                    <button
+                        onClick={() => setShowInput(true)}
+                        className="px-6 py-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition"
+                    >
+                        ➕ Add Integration
+                    </button>
+                )}
+            </div>
 
-  return (
-    <div className="p-4">
-      <h1 className="text-2xl font-bold mb-4">Your Integrations</h1>
-      <button
-        className="bg-blue-600 text-white px-4 py-2 rounded mb-4"
-        onClick={addIntegration}
-      >
-        ➕ Add Integration
-      </button>
+            {integrations.length === 0 ? (
+                <p className="text-center text-gray-400">No integrations yet.</p>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
+                    {integrations.map((int) => (
+                        <div
+                            key={int.integrationId}
+                            className="bg-gray-800 border border-gray-700 rounded-xl p-6 shadow-lg hover:shadow-blue-600/30 transition"
+                        >
+                            <h2 className="text-xl font-semibold text-blue-300 mb-2">
+                                {int.name}
+                            </h2>
+                            <p className="text-sm text-gray-400 font-mono mb-4">
+                                {int.requests?.length ?? 0} request(s)
+                            </p>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => navigate(`/integration/${int.integrationId}`)}
+                                    className="px-4 py-1.5 bg-yellow-500 text-black rounded hover:bg-yellow-600"
+                                >
+                                    ✏️ Edit
+                                </button>
 
-      {integrations.length === 0 ? (
-        <p className="text-gray-500">No integrations yet.</p>
-      ) : (
-        <div className="space-y-3">
-          {integrations.map((int) => (
-            <IntegrationCard
-              key={int.id}
-              integration={int}
-              onRun={() => runIntegration(int)}
-              onDelete={() => deleteIntegration(int.id)}
-            />
-          ))}
+                                <button className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md text-sm font-medium"
+                                    onClick={() => deleteIntegration(int.integrationId)}
+                                >
+                                    🗑️ Delete
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
         </div>
-      )}
-    </div>
-  );
+    );
 }

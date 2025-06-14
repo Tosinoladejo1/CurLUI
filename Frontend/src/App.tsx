@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Home from "./pages/Home";
 import IntegrationEditor from "./pages/IntegrationEditor";
 import RequestEditor from "./pages/RequestEditor";
+import "./index.css"; // Ensure global styles are imported
 
 export default function App() {
   return (
@@ -10,6 +11,7 @@ export default function App() {
         <Route path="/" element={<Home />} />
         <Route path="/integration/:id" element={<IntegrationEditor />} />
         <Route path="/integration/:id/request/:requestId" element={<RequestEditor />} />
+        
       </Routes>
     </Router>
   );

@@ -1,4 +1,4 @@
-# Makefile for API Integration Utility (.NET Core 9)
+
 
 PROJECT=Backend/ApiIntegrationUtility.csproj
 TEST_PROJECT=Backend/ApiIntegrationUtility.Tests/ApiIntegrationUtility.Tests.csproj

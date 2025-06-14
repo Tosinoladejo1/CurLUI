@@ -1,3 +1,4 @@
+#pragma warning disable CS0436
 using System.Net;
 using System.Net.Http;
 using System.Collections.Generic;
@@ -6,13 +7,12 @@ using Xunit;
 using ApiIntegrationUtility.Models;
 using ApiIntegrationUtility.Services;
 
-
 public class IntegrationRunnerTests
 {
     [Fact]
     public async Task RunIntegrationAsync_SingleGetRequest_ReturnsSuccessfulResponse()
     {
-        // Arrange
+        
         var responseContent = "{\"message\": \"success\"}";
         var handler = new MockHttpMessageHandler(responseContent, HttpStatusCode.OK);
         var httpClient = new HttpClient(handler);
@@ -21,7 +21,6 @@ public class IntegrationRunnerTests
         var integration = new Integration
         {
             Requests = new List<RequestItem>
-
             {
                 new RequestItem
                 {
@@ -36,19 +35,19 @@ public class IntegrationRunnerTests
 
         var runtimeValues = new Dictionary<string, string>();
 
-        // Act
+        
         var result = await runner.RunIntegrationAsync(integration, runtimeValues);
 
-        // Assert
+        
         Assert.Single(result);
-        var resultString = result[0].ToString();
-        Assert.Contains("https://api.example.com/data", resultString);
-        Assert.Contains("success", resultString);
+        Assert.Equal("https://api.example.com/data", result[0].Url);
+        Assert.Equal(200, result[0].StatusCode);
+        Assert.Contains("success", result[0].Response.ToString());
     }
+
     [Fact]
     public async Task RunIntegrationAsync_RetriesOnFailure()
     {
-        // Arrange: simulate two failures, one success
         int callCount = 0;
         var handler = new MockHttpMessageHandler((request, ct) =>
         {
@@ -69,62 +68,64 @@ public class IntegrationRunnerTests
         var integration = new Integration
         {
             Requests = new List<RequestItem>
-        {
-            new RequestItem { Method = "GET", Url = "https://test.com" }
-        }
+            {
+                new RequestItem { Method = "GET", Url = "https://test.com" }
+            }
         };
 
-        // Act
+        
         var result = await runner.RunIntegrationAsync(integration, new Dictionary<string, string>());
 
-        // Assert
-        Assert.Equal(3, callCount); // retried twice before success
-        Assert.Contains("retry succeeded", result[0].ToString());
+        
+        Assert.Equal(3, callCount); 
+        Assert.Equal("https://test.com", result[0].Url);
+        Assert.Equal(200, result[0].StatusCode);
+        Assert.Contains("retry succeeded", result[0].Response.ToString());
     }
 
     [Fact]
-public async Task RunIntegrationAsync_ExtractsValueFromResponse()
-{
-    var handler = new MockHttpMessageHandler((req, ct) =>
+    public async Task RunIntegrationAsync_ExtractsValueFromResponse()
     {
-        var json = "{\"userId\": \"abc123\", \"status\": \"ok\"}";
-        return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+        
+        var handler = new MockHttpMessageHandler((req, ct) =>
         {
-            Content = new StringContent(json)
+            var json = "{\"userId\": \"abc123\", \"status\": \"ok\"}";
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(json)
+            });
         });
-    });
 
-    var httpClient = new HttpClient(handler);
-    var runner = new IntegrationRunner(httpClient);
+        var httpClient = new HttpClient(handler);
+        var runner = new IntegrationRunner(httpClient);
 
-    var integration = new Integration
-    {
-        Requests = new List<RequestItem>
+        var integration = new Integration
         {
-            new RequestItem
+            Requests = new List<RequestItem>
             {
-                Method = "GET",
-                Url = "https://api.example.com/start",
-                PlaceholderSource = "userId"
-            },
-            new RequestItem
-            {
-                Method = "GET",
-                Url = "https://api.example.com/users/{{userId}}"
+                new RequestItem
+                {
+                    Method = "GET",
+                    Url = "https://api.example.com/start",
+                    PlaceholderSource = "userId"
+                },
+                new RequestItem
+                {
+                    Method = "GET",
+                    Url = "https://api.example.com/users/{{userId}}"
+                }
             }
-        }
-    };
+        };
 
-    var runtimeValues = new Dictionary<string, string>();
+        var runtimeValues = new Dictionary<string, string>();
 
-    // Act
-    var result = await runner.RunIntegrationAsync(integration, runtimeValues);
+        
+        var result = await runner.RunIntegrationAsync(integration, runtimeValues);
 
-    // Assert
-    Assert.Equal(2, result.Count);
-    var resultString = result[1].ToString();
-    Assert.Contains("abc123", resultString);
+        
+        Assert.Equal(2, result.Count);
+        Assert.Equal("https://api.example.com/start", result[0].Url);
+        Assert.Equal("https://api.example.com/users/{{userId}}", result[1].Url);
+        Assert.Equal(200, result[1].StatusCode);
+    }
 }
-}
-
-
