@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import type { Integration, RequestItem } from "../types/types";
 import API from "../utility/api";
 
-// ✅ Define expected run result type
+
 type RunResponse = {
     url: string;
     statusCode: number;

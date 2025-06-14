@@ -2,6 +2,8 @@
 
 PROJECT=Backend/ApiIntegrationUtility.csproj
 TEST_PROJECT=Backend/ApiIntegrationUtility.Tests/ApiIntegrationUtility.Tests.csproj
+.PHONY: frontend backend dev clean-images help
+
 
 build:
 	dotnet build $(PROJECT)
@@ -18,6 +20,19 @@ clean:
 watch:
 	dotnet watch --project $(PROJECT)
 
+frontend-build:
+	docker build -t api-frontend -f Frontend/Dockerfile Frontend
+
+frontend-run:
+	docker run --rm -it \
+		-p 5173:5173 \
+		-v ${PWD}/Frontend:/app \
+		-w /app \
+		-e CHOKIDAR_USEPOLLING=true \
+		api-frontend \
+		sh -c "npm install && npm run dev"
+
+		
 help:
 	@echo "Available commands:"
 	@echo "  build   - Compile the API project"

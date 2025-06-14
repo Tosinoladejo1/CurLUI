@@ -83,7 +83,7 @@ export default function IntegrationEditor() {
         }
     };
 
-    // Delete an existing request
+    
     const deleteRequest = async (reqId: string) => {
         if (!integration) return;
 
